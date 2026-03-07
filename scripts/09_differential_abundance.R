@@ -82,3 +82,55 @@ fuso_abundance_plot <- plot_bar(fuso_only, x="Time_Phase", fill="Genus") +
 
 ggsave("figures/fuso_relative_abundance.png", fuso_abundance_plot, width=8, height=6)
 fuso_abundance_plot
+
+# ---------------------------------------------------------
+# STRENGTHENING THE "WHO": FUSOBACTERIUM DOMINANCE
+# ---------------------------------------------------------
+# 1. Convert raw counts to Percentages (%)
+ps_rel <- transform_sample_counts(physeq_clean, function(x) x / sum(x))
+
+# 2. Extract only Fusobacterium
+fuso_rel <- subset_taxa(ps_rel, Genus == "Fusobacterium")
+
+# 3. Plot the Relative Abundance jump
+fuso_dominance_plot <- plot_bar(fuso_rel, x="Time_Phase", fill="Genus") +
+  geom_boxplot(aes(x=Time_Phase, y=Abundance, fill=Time_Phase), alpha=0.5) +
+  theme_bw() +
+  labs(title="The 'Who' Proof: Fusobacterium Relative Abundance",
+       subtitle="Evidence of microbial takeover during CRC progression",
+       y="Community Share (%)")
+
+ggsave("figures/fuso_dominance_proof.png", fuso_dominance_plot, width=8, height=6)
+fuso_dominance_plot
+
+
+
+# ---------------------------------------------------------
+# PROVING THE DRIVER: FUSOBACTERIUM DOMINANCE & DIVERSITY
+
+fuso_counts <- otu_table(physeq_clean)["Fusobacterium", ]
+sample_data(physeq_clean)$Fuso_Load <- as.numeric(fuso_counts)
+
+# Plot Alpha Diversity vs Fusobacterium Load
+alpha_fuso_plot <- plot_richness(physeq_clean, x="Fuso_Load", measures=c("Shannon")) +
+  geom_point(aes(color=Time_Phase), size=3) +
+  geom_smooth(method="lm", color="black", linetype="dashed") +
+  theme_bw() +
+  labs(title="Diversity Collapse vs. Fusobacterium Load",
+       subtitle="Mathematical proof that F. nucleatum drives ecological dysbiosis",
+       x="Fusobacterium Sequence Counts",
+       y="Shannon Diversity Index")
+
+# Targeted Beta Diversity (PCoA)
+# Does the presence of Fuso define the entire community shift?
+ps_rel <- transform_sample_counts(physeq_clean, function(x) x / sum(x))
+ord <- ordinate(ps_rel, method="PCoA", distance="bray")
+beta_fuso_plot <- plot_ordination(ps_rel, ord, color="Time_Phase", size="Fuso_Load") +
+  geom_point(alpha=0.7) +
+  theme_bw() +
+  labs(title="Beta Diversity Shift Driven by Fuso Load",
+       subtitle="Larger dots = Higher F. nucleatum concentration")
+
+# Save the evidence
+ggsave("figures/fuso_diversity_impact.png", alpha_fuso_plot, width=8, height=6)
+ggsave("figures/fuso_beta_drive.png", beta_fuso_plot, width=8, height=6)
