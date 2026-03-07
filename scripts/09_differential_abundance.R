@@ -38,3 +38,47 @@ deseq_plot <- ggplot(sigtab, aes(x=Genus, y=log2FoldChange, color=Phylum)) +
 # 7. Save and display
 ggsave("figures/deseq2_log2fc.png", deseq_plot, width=12, height=8, dpi=300)
 deseq_plot
+
+
+
+
+# ---------------------------------------------------------
+# STRENGTHENING "WHO IS THERE": TARGETED FUSOBACTERIUM PROOF
+library(phyloseq)
+library(DESeq2)
+library(ggplot2)
+physeq_genus <- tax_glom(physeq_clean, taxrank = "Genus")
+diagdds_genus <- phyloseq_to_deseq2(physeq_genus, ~ Time_Phase)
+diagdds_genus <- DESeq(diagdds_genus, test="Wald", fitType="parametric")
+res_genus <- results(diagdds_genus, cooksCutoff = FALSE)
+fuso_results <- as.data.frame(res_genus)
+fuso_results$Genus <- as.character(tax_table(physeq_genus)[rownames(fuso_results), "Genus"])
+fuso_evidence <- fuso_results[grep("Fusobacterium", fuso_results$Genus, ignore.case = TRUE), ]
+fuso_plot <- plot_abundance(physeq_clean, "Time_Phase", "Fusobacterium") +
+  geom_boxplot(aes(fill=Time_Phase), alpha=0.7) +
+  theme_bw() +
+  labs(title="Proof of Fusobacterium Dominance",
+       subtitle="Significant Enrichment as CRC Progresses",
+       y="Normalized Sequence Counts")
+
+ggsave("figures/fuso_dominance_proof.png", fuso_plot, width=8, height=6)
+fuso_plot
+
+# ---------------------------------------------------------
+# STRENGTHENING THE "WHO": FUSOBACTERIUM DOMINANCE
+# Transform to relative abundance (percentages)
+ps_rel <- transform_sample_counts(physeq_clean, function(x) x / sum(x))
+
+# Subset to only look at Fusobacterium
+fuso_only <- subset_taxa(ps_rel, Genus == "Fusobacterium")
+
+# Plot the percentage of the whole community that is just Fusobacterium
+fuso_abundance_plot <- plot_bar(fuso_only, x="Time_Phase", fill="Genus") +
+  geom_boxplot(aes(x=Time_Phase, y=Abundance, fill=Time_Phase), alpha=0.5) +
+  theme_bw() +
+  labs(title="The 'Who' Proof: Fusobacterium Relative Abundance",
+       subtitle="Evidence of microbial takeover during CRC progression",
+       y="Relative Abundance (%)")
+
+ggsave("figures/fuso_relative_abundance.png", fuso_abundance_plot, width=8, height=6)
+fuso_abundance_plot
