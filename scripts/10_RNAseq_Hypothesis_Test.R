@@ -224,3 +224,23 @@ sig_plot <- ggplot(top_combined, aes(x=reorder(Gene, log2FoldChange), y=log2Fold
 # Save and display
 ggsave("figures/top_30_sig_genes.png", sig_plot, width=10, height=8, dpi=300)
 sig_plot
+
+# ---------------------------------------------------------
+# STEP 11: PATHWAY ENRICHMENT (THE "CIRCUITS")
+print("11/11: Running Pathway Enrichment Analysis...")
+# Install the enrichment engine
+if (!require("msigdbr", quietly = TRUE)) install.packages("msigdbr")
+if (!require("clusterProfiler", quietly = TRUE)) BiocManager::install("clusterProfiler")
+library(msigdbr)
+library(clusterProfiler)
+h_df <- msigdbr(species = "Homo sapiens", category = "H")
+h_list <- h_df %>% split(x = .$gene_symbol, f = .$gs_name)
+res_for_gsea <- res_df[!is.na(res_df$stat), ]
+gene_list <- res_for_gsea$stat
+names(gene_list) <- rownames(res_for_gsea)
+gene_list <- sort(gene_list, decreasing = TRUE)
+gsea_res <- GSEA(gene_list, TERM2GENE = h_df[,c("gs_name", "gene_symbol")], pvalueCutoff = 0.05)
+dot_plot <- dotplot(gsea_res, showCategory=15) + 
+  ggtitle("Hijacked Biological Circuits: F. nucleatum vs Control")
+ggsave("figures/hijacked_pathways.png", dot_plot, width=10, height=8, dpi=300)
+dot_plot
