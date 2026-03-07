@@ -197,3 +197,30 @@ bar_plot <- ggplot(target_data, aes(x=reorder(Gene, -log2FoldChange), y=log2Fold
 
 ggsave("figures/targeted_mechanistic_bars.png", bar_plot, width=9, height=6, dpi=300)
 bar_plot
+
+# ---------------------------------------------------------
+# STEP 10: TOP SIGNIFICANT DIFFERENTIALLY EXPRESSED GENES
+print("10/10: Plotting Top 30 Significant Genes (Up & Down)...")
+# Load the data we exported earlier
+up_genes <- read.csv("figures/upregulated_genes_list.csv", row.names = 1)
+down_genes <- read.csv("figures/downregulated_genes_list.csv", row.names = 1)
+top_up <- up_genes[order(up_genes$padj), ][1:15, ]
+top_down <- down_genes[order(down_genes$padj), ][1:15, ]
+# Combine for plotting
+top_combined <- rbind(top_up, top_down)
+top_combined$Gene <- rownames(top_combined)
+# Create the professional comparison plot
+sig_plot <- ggplot(top_combined, aes(x=reorder(Gene, log2FoldChange), y=log2FoldChange, fill=Significance)) +
+  geom_bar(stat="identity", color="black", alpha=0.8) +
+  coord_flip() + # Flip for better readability of gene names
+  scale_fill_manual(values=c("Upregulated" = "#d73027", "Downregulated" = "#4575b4")) +
+  theme_bw() +
+  labs(title="Top 30 Significant Expression Shifts (GSE90944)",
+       subtitle="Identifying Primary Mechanistic Candidates in F. nucleatum Infection",
+       x="Gene Name",
+       y="Log2 Fold Change") +
+  theme(axis.text.y = element_text(face="bold"))
+
+# Save and display
+ggsave("figures/top_30_sig_genes.png", sig_plot, width=10, height=8, dpi=300)
+sig_plot
