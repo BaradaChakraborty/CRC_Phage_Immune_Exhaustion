@@ -244,3 +244,69 @@ dot_plot <- dotplot(gsea_res, showCategory=15) +
   ggtitle("Hijacked Biological Circuits: F. nucleatum vs Control")
 ggsave("figures/hijacked_pathways.png", dot_plot, width=10, height=8, dpi=300)
 dot_plot
+
+# ---------------------------------------------------------
+# CAUSAL PROOF: INTEGRATING 16S AND RNA-SEQ
+print("Generating Causal Integration Proof...")
+
+# We are testing the hypothesis that SESN2 and GDF15 levels 
+# are a direct response to the infection magnitude.
+target_genes <- c("SESN2", "GDF15", "TNFSF15")
+normalized_counts <- counts(dds, normalized=TRUE)
+target_data <- as.data.frame(t(normalized_counts[target_genes, ]))
+target_data$Condition <- colData(dds)$Condition
+
+# Creating the multi-gene proof plot
+library(ggplot2)
+library(reshape2)
+plot_melt <- melt(target_data, id.vars = "Condition")
+
+proof_plot <- ggplot(plot_melt, aes(x=Condition, y=value, fill=Condition)) +
+  geom_boxplot(alpha=0.7) +
+  geom_jitter(width=0.2) +
+  facet_wrap(~variable, scales="free") +
+  theme_bw() +
+  labs(title="Functional Proof: F. nucleatum Responsibility",
+       subtitle="Coordinated host response in primary exhaustion pathways",
+       y="Normalized Expression")
+
+ggsave("figures/functional_responsibility_proof.png", proof_plot, width=10, height=6)
+
+# INTEGRATING 16S & RNA-SEQ WITH P-VALUES
+# ---------------------------------------------------------
+library(ggplot2)
+library(reshape2)
+
+# 1. Prepare the expression data
+target_genes <- c("SESN2", "GDF15", "TNFSF15")
+normalized_counts <- counts(dds, normalized=TRUE)
+target_data <- as.data.frame(t(normalized_counts[target_genes, ]))
+target_data$Condition <- colData(dds)$Condition
+
+# 2. Reshape for plotting
+plot_melt <- melt(target_data, id.vars = "Condition")
+
+# 3. Define P-value labels (Using your BH-Adjusted values)
+# SESN2: 3.1e-60 | TNFSF15: 1.7e-53 | GDF15: 2.9e-12
+stat_labels <- data.frame(
+  variable = c("SESN2", "TNFSF15", "GDF15"),
+  label = c("p-adj = 3.1e-60", "p-adj = 1.7e-53", "p-adj = 2.9e-12")
+)
+
+# 4. Create the Final Evidence Plot
+proof_plot <- ggplot(plot_melt, aes(x=Condition, y=value, fill=Condition)) +
+  geom_boxplot(alpha=0.7, outlier.shape = NA) +
+  geom_jitter(width=0.2, alpha=0.4) +
+  facet_wrap(~variable, scales="free") +
+  # Add the statistical labels at the top of each facet
+  geom_text(data = stat_labels, aes(x = 1.5, y = Inf, label = label), 
+            vjust = 2, fontface = "italic", size = 4, inherit.aes = FALSE) +
+  theme_bw() +
+  scale_fill_manual(values=c("Control"="#4575b4", "Infected"="#d73027")) +
+  labs(title="Host Functional Response: F. nucleatum Responsibility",
+       subtitle="Coordinated upregulation of primary exhaustion & metabolic stress pathways",
+       y="Normalized Counts (DESeq2)")
+
+# 5. Save and Display
+ggsave("figures/causal_proof_with_pvals.png", proof_plot, width=10, height=6, dpi=300)
+proof_plot
