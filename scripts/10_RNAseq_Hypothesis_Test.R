@@ -1,34 +1,24 @@
-# ---------------------------------------------------------
-# HYPOTHESIS TEST: F. nucleatum -> mTOR -> Immune Exhaustion
-# ---------------------------------------------------------
 
-# STEP 1: LOAD THE LIBRARIES
-# (We install the GEO downloader if you don't have it)
 if (!require("BiocManager", quietly = TRUE)) install.packages("BiocManager")
 BiocManager::install(c("GEOquery", "DESeq2"), update=FALSE, ask=FALSE)
 
 library(GEOquery)
 library(DESeq2)
 
-# STEP 1: DOWNLOAD METADATA
 print("1/5: Downloading clinical metadata...")
 gse <- getGEO("GSE90944", GSEMatrix = TRUE)
 meta <- pData(phenoData(gse[[1]]))
 
-# STEP 2: DOWNLOAD AND UNPACK THE RAW DATA (.tar archive)
 print("2/5: Downloading and unpacking the raw .tar file...")
 file_paths <- getGEOSuppFiles("GSE90944")
 tar_file <- rownames(file_paths)[1]
 
-# This is the fix! We unpack the archive into a new folder
 untar(tar_file, exdir = "GSE90944_unpacked")
 
-# STEP 3: GLUE THE 6 SAMPLES INTO ONE MASTER TABLE
 print("3/5: Merging individual samples into a master matrix...")
 sample_files <- list.files("GSE90944_unpacked", full.names = TRUE)
 count_list <- list()
 
-# Loop through all 6 unpacked files and read them
 for (file in sample_files) {
   # Read the individual text file
   temp_data <- read.table(file, header = FALSE, row.names = 1, stringsAsFactors = FALSE)
@@ -40,27 +30,21 @@ for (file in sample_files) {
   count_list[[gsm_id]] <- temp_data
 }
 
-# Bind them side-by-side and force them into a clean numeric matrix
 counts_df <- do.call(cbind, count_list)
 counts_df <- as.matrix(counts_df)
 
-# STEP 4: ALIGN THE METADATA AND RUN DESEQ2
 print("4/5: Aligning data and running DESeq2 algorithm...")
 
-# Create our "Infected" vs "Control" groups
 meta$Condition <- ifelse(grepl("Fn|nucleatum", meta$title, ignore.case=TRUE), "Infected", "Control")
 meta$Condition <- factor(meta$Condition, levels = c("Control", "Infected"))
 
-# Ensure the columns in our math table perfectly match the rows in our metadata table
 counts_df <- counts_df[, rownames(meta)]
 
-# Run the core statistics
 dds <- DESeqDataSetFromMatrix(countData = counts_df, colData = meta, design = ~ Condition)
 dds <- DESeq(dds)
 res <- results(dds, contrast=c("Condition", "Infected", "Control"))
 res_df <- as.data.frame(res)
 
-# STEP 5: PROVE THE HYPOTHESIS
 print("5/5: Hunting for EEF2K, MTOR, and CD274 (PD-L1)...")
 hypothesis_genes <- res_df[grep("^EEF2K$|^MTOR$|^CD274$", rownames(res_df), ignore.case=TRUE), ]
 
@@ -69,18 +53,14 @@ print("   HYPOTHESIS TEST RESULTS (Log2 Fold Change)     ")
 print("==================================================")
 print(hypothesis_genes[, c("log2FoldChange", "padj")])
 
-# STEP 6: VISUALIZATION (VOLCANO PLOT)
 print("6/6: Generating Volcano Plot...")
 
-# Remove NA values so ggplot doesn't throw an error
 res_clean <- res_df[!is.na(res_df$padj) & !is.na(res_df$log2FoldChange), ]
 
-# Create a new column to label significant genes (padj < 0.05 AND absolute log2FC > 1)
 res_clean$Significance <- "Not Significant"
 res_clean$Significance[res_clean$log2FoldChange > 1 & res_clean$padj < 0.05] <- "Upregulated"
 res_clean$Significance[res_clean$log2FoldChange < -1 & res_clean$padj < 0.05] <- "Downregulated"
 
-# Generate the plot
 volcano_plot <- ggplot(res_clean, aes(x=log2FoldChange, y=-log10(padj), color=Significance)) +
   geom_point(alpha=0.6, size=2) +
   scale_color_manual(values=c("blue", "grey", "red")) +
@@ -91,31 +71,23 @@ volcano_plot <- ggplot(res_clean, aes(x=log2FoldChange, y=-log10(padj), color=Si
        x="Log2 Fold Change",
        y="-Log10 Adjusted P-value")
 
-# Save and display
 ggsave("figures/rnaseq_volcano.png", volcano_plot, width=8, height=6, dpi=300)
 volcano_plot
 
 
-# STEP 7: ADDING SMART GENE LABELS (ggrepel)
 print("7/7: Adding specific gene labels to the Volcano Plot...")
 
-# 1. Install and load the ggrepel package
 if (!require("ggrepel", quietly = TRUE)) install.packages("ggrepel")
 library(ggrepel)
 
-# 2. Create an empty column for our labels
 res_clean$GeneLabel <- ""
 
-# 3. Define exactly who we want to label!
-# We want your specific mechanism targets, plus we will grab the top 15 most significant genes
 your_targets <- c("CD274", "ALPK1", "NFKB1", "EEF2K", "MTOR")
 top_significant_genes <- head(rownames(res_clean[order(res_clean$padj), ]), 15)
 genes_to_label <- unique(c(your_targets, top_significant_genes))
 
-# 4. Fill the label column ONLY if the gene is in our target list
 res_clean$GeneLabel <- ifelse(rownames(res_clean) %in% genes_to_label, rownames(res_clean), "")
 
-# 5. Generate the upgraded, labeled plot
 volcano_labeled <- ggplot(res_clean, aes(x=log2FoldChange, y=-log10(padj), color=Significance)) +
   geom_point(alpha=0.6, size=2) +
   scale_color_manual(values=c("blue", "grey", "red")) +
@@ -137,47 +109,34 @@ volcano_labeled <- ggplot(res_clean, aes(x=log2FoldChange, y=-log10(padj), color
        x="Log2 Fold Change",
        y="-Log10 Adjusted P-value")
 
-# 6. Save and display the final masterpiece
 ggsave("figures/rnaseq_volcano_labeled.png", volcano_labeled, width=10, height=8, dpi=300)
 volcano_labeled
 
-# ---------------------------------------------------------
-# STEP 8: EXPORTING GENE LISTS TO CSV
-# ---------------------------------------------------------
 print("8/8: Exporting significant gene lists to CSV files...")
 
-# Create separate tables for each category
 upregulated <- subset(res_clean, Significance == "Upregulated")
 downregulated <- subset(res_clean, Significance == "Downregulated")
 ns_genes <- subset(res_clean, Significance == "Not Significant")
 
-# Order the Upregulated and Downregulated genes by fold change so the most extreme are at the top
 upregulated <- upregulated[order(-upregulated$log2FoldChange), ]
 downregulated <- downregulated[order(downregulated$log2FoldChange), ]
 
-# Save them as permanent spreadsheet files in your data or figures folder
 write.csv(upregulated, "figures/upregulated_genes_list.csv")
 write.csv(downregulated, "figures/downregulated_genes_list.csv")
-# Note: We usually don't export the Not Significant genes to save space, but here it is:
 write.csv(ns_genes, "figures/notsignificant_genes_list.csv")
 
 print("Export complete! Files saved to the figures/ directory.")
 
-# ---------------------------------------------------------
-# STEP 9: TARGETED MECHANISTIC BAR CHART
 
 print("9/9: Generating Targeted Bar Chart for Mechanistic Pitch...")
 target_genes <- c("ALPK1", "NFKB1", "CD274", "TNFSF15", "GDF15")
-# (We use the original res_df so we don't lose CD274 due to its NA p-value)
 target_data <- res_df[rownames(res_df) %in% target_genes, ]
 target_data$Gene <- rownames(target_data)
 
-# Create a custom category to color-code the bars professionally
 target_data$Hit_Type <- "Mechanistic Trend (Non-Sig in vitro)"
 target_data$Hit_Type[target_data$padj < 0.05 & target_data$log2FoldChange > 1] <- "Significant Upregulation"
 target_data$Hit_Type[is.na(target_data$padj)] <- "Mechanistic Trend (Low Baseline)"
 
-# Generate the bar chart with Standard Error (lfcSE) whiskers
 bar_plot <- ggplot(target_data, aes(x=reorder(Gene, -log2FoldChange), y=log2FoldChange, fill=Hit_Type)) +
   geom_col(color="black", alpha=0.8, width=0.7) +
   # This adds the professional error bars!
@@ -198,18 +157,13 @@ bar_plot <- ggplot(target_data, aes(x=reorder(Gene, -log2FoldChange), y=log2Fold
 ggsave("figures/targeted_mechanistic_bars.png", bar_plot, width=9, height=6, dpi=300)
 bar_plot
 
-# ---------------------------------------------------------
-# STEP 10: TOP SIGNIFICANT DIFFERENTIALLY EXPRESSED GENES
 print("10/10: Plotting Top 30 Significant Genes (Up & Down)...")
-# Load the data we exported earlier
 up_genes <- read.csv("figures/upregulated_genes_list.csv", row.names = 1)
 down_genes <- read.csv("figures/downregulated_genes_list.csv", row.names = 1)
 top_up <- up_genes[order(up_genes$padj), ][1:15, ]
 top_down <- down_genes[order(down_genes$padj), ][1:15, ]
-# Combine for plotting
 top_combined <- rbind(top_up, top_down)
 top_combined$Gene <- rownames(top_combined)
-# Create the professional comparison plot
 sig_plot <- ggplot(top_combined, aes(x=reorder(Gene, log2FoldChange), y=log2FoldChange, fill=Significance)) +
   geom_bar(stat="identity", color="black", alpha=0.8) +
   coord_flip() + # Flip for better readability of gene names
@@ -221,14 +175,10 @@ sig_plot <- ggplot(top_combined, aes(x=reorder(Gene, log2FoldChange), y=log2Fold
        y="Log2 Fold Change") +
   theme(axis.text.y = element_text(face="bold"))
 
-# Save and display
 ggsave("figures/top_30_sig_genes.png", sig_plot, width=10, height=8, dpi=300)
 sig_plot
 
-# ---------------------------------------------------------
-# STEP 11: PATHWAY ENRICHMENT (THE "CIRCUITS")
 print("11/11: Running Pathway Enrichment Analysis...")
-# Install the enrichment engine
 if (!require("msigdbr", quietly = TRUE)) install.packages("msigdbr")
 if (!require("clusterProfiler", quietly = TRUE)) BiocManager::install("clusterProfiler")
 library(msigdbr)
@@ -245,18 +195,13 @@ dot_plot <- dotplot(gsea_res, showCategory=15) +
 ggsave("figures/hijacked_pathways.png", dot_plot, width=10, height=8, dpi=300)
 dot_plot
 
-# ---------------------------------------------------------
-# CAUSAL PROOF: INTEGRATING 16S AND RNA-SEQ
 print("Generating Causal Integration Proof...")
 
-# We are testing the hypothesis that SESN2 and GDF15 levels 
-# are a direct response to the infection magnitude.
 target_genes <- c("SESN2", "GDF15", "TNFSF15")
 normalized_counts <- counts(dds, normalized=TRUE)
 target_data <- as.data.frame(t(normalized_counts[target_genes, ]))
 target_data$Condition <- colData(dds)$Condition
 
-# Creating the multi-gene proof plot
 library(ggplot2)
 library(reshape2)
 plot_melt <- melt(target_data, id.vars = "Condition")
@@ -272,28 +217,21 @@ proof_plot <- ggplot(plot_melt, aes(x=Condition, y=value, fill=Condition)) +
 
 ggsave("figures/functional_responsibility_proof.png", proof_plot, width=10, height=6)
 
-# INTEGRATING 16S & RNA-SEQ WITH P-VALUES
-# ---------------------------------------------------------
 library(ggplot2)
 library(reshape2)
 
-# 1. Prepare the expression data
 target_genes <- c("SESN2", "GDF15", "TNFSF15")
 normalized_counts <- counts(dds, normalized=TRUE)
 target_data <- as.data.frame(t(normalized_counts[target_genes, ]))
 target_data$Condition <- colData(dds)$Condition
 
-# 2. Reshape for plotting
 plot_melt <- melt(target_data, id.vars = "Condition")
 
-# 3. Define P-value labels (Using your BH-Adjusted values)
-# SESN2: 3.1e-60 | TNFSF15: 1.7e-53 | GDF15: 2.9e-12
 stat_labels <- data.frame(
   variable = c("SESN2", "TNFSF15", "GDF15"),
   label = c("p-adj = 3.1e-60", "p-adj = 1.7e-53", "p-adj = 2.9e-12")
 )
 
-# 4. Create the Final Evidence Plot
 proof_plot <- ggplot(plot_melt, aes(x=Condition, y=value, fill=Condition)) +
   geom_boxplot(alpha=0.7, outlier.shape = NA) +
   geom_jitter(width=0.2, alpha=0.4) +
@@ -307,6 +245,5 @@ proof_plot <- ggplot(plot_melt, aes(x=Condition, y=value, fill=Condition)) +
        subtitle="Coordinated upregulation of primary exhaustion & metabolic stress pathways",
        y="Normalized Counts (DESeq2)")
 
-# 5. Save and Display
 ggsave("figures/causal_proof_with_pvals.png", proof_plot, width=10, height=6, dpi=300)
 proof_plot
