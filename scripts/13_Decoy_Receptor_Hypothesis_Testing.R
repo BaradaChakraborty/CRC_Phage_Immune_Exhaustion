@@ -143,3 +143,57 @@ tryCatch({
   print("Recommendation: Proceed with the 'Signal Overload' mechanism for the manuscript.")
   print("---------------------------------------------------")
 })
+
+print("Initializing cBioPortal bypass for CPTAC-COAD data")
+
+if (!requireNamespace("cBioPortalData", quietly = TRUE)) BiocManager::install("cBioPortalData", update = FALSE)
+library(cBioPortalData)
+
+print("Downloading pre-assembled CPTAC tarball directly from MSKCC servers")
+cptac_data <- cBioDataPack("coad_cptac_2019", ask = FALSE)
+
+print("Extracting global protein mass spectrometry matrix")
+prot_assay <- experiments(cptac_data)[["protein_abundance_log2ratio"]]
+prot_matrix <- as.data.frame(assay(prot_assay))
+
+print("Checking for the Decoy Receptor (TNFRSF6B) and Exhaustion Shield proteins")
+target_proteins <- c("TNFRSF6B", "GDF15", "SESN2", "TNFSF15")
+decoy_results <- prot_matrix[rownames(prot_matrix) %in% target_proteins, ]
+
+if(nrow(decoy_results) > 0) {
+  write.csv(decoy_results, "results/cptac_decoy_bypass_results.csv")
+  print("SUCCESS: Target proteins located in pre-assembled matrix.")
+  print(rownames(decoy_results))
+} else {
+  print("Target proteins not detected in this specific mass spectrometry panel.")
+}
+
+geo_data <- read.table("data/GSEXXXXXX_series_matrix.txt", sep="\t", header=TRUE, comment.char="!")
+
+decoy_expression <- geo_data[geo_data$GeneSymbol == "TNFRSF6B", ]
+
+print(decoy_expression)
+
+
+print("Querying the STRING-db API for stable protein interaction networks...")
+
+proteins <- c("TNFSF15", "TNFRSF6B", "GDF15", "SESN2")
+protein_string <- paste(proteins, collapse = "%0d")
+
+string_url <- paste0(
+  "https://string-db.org/api/tsv/network?",
+  "identifiers=", protein_string,
+  "&species=9606"
+)
+
+interaction_data <- read.table(string_url, sep = "\t", header = TRUE)
+
+if(nrow(interaction_data) > 0) {
+  clean_network <- interaction_data[, c("preferredName_A", "preferredName_B", "score")]
+  print("SUCCESS: Functional biological network established.")
+  print(clean_network)
+} else {
+  print("No direct functional network found in STRING-db.")
+}
+
+write.csv(clean_network, "results/string_db_interaction.csv", row.names = FALSE)
