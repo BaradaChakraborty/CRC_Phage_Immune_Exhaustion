@@ -1,5 +1,4 @@
 renv::init()
-# STEP 1: ENVIRONMENT SETUP & PACKAGE INSTALLATION
 if (!requireNamespace("BiocManager", quietly = TRUE))
   install.packages("BiocManager")
 BiocManager::install(c("dada2", "phyloseq"))

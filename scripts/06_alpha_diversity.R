@@ -1,5 +1,3 @@
-# STEP 10: LONGITUDINAL ALPHA DIVERSITY VISUALIZATION
-# library(phyloseq); library(ggplot2)
 
 sample_data(physeq_obj)$Day <- as.factor(sample_data(physeq_obj)$Day)
 
@@ -12,12 +10,10 @@ alpha_plot_time <- plot_richness(physeq_obj, x="Day", measures=c("Shannon", "Sim
        x = "Clinical Timepoint (Day)",
        y = "Alpha Diversity Measure")
 
-# Save the new, relevant plot
 ggsave(filename = "figures/alpha_diversity_longitudinal.png", 
        plot = alpha_plot_time, 
        width = 8, 
        height = 6, 
        dpi = 300)
 
-# Display the plot
 alpha_plot_time
