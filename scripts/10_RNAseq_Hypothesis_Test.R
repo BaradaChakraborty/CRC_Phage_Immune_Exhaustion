@@ -247,3 +247,36 @@ proof_plot <- ggplot(plot_melt, aes(x=Condition, y=value, fill=Condition)) +
 
 ggsave("figures/causal_proof_with_pvals.png", proof_plot, width=10, height=6, dpi=300)
 proof_plot
+
+
+library(ggplot2)
+library(reshape2)
+
+target_genes <- c("HBEGF", "GDF15")
+
+normalized_counts <- counts(dds, normalized=TRUE)
+target_data <- as.data.frame(t(normalized_counts[target_genes, ]))
+target_data$Condition <- colData(dds)$Condition
+
+plot_melt <- melt(target_data, id.vars = "Condition")
+
+stat_labels <- data.frame(
+  variable = c("HBEGF", "GDF15"),
+  label = c("p-adj < 0.001", "p-adj = 2.9e-12") 
+)
+
+proof_plot <- ggplot(plot_melt, aes(x=Condition, y=value, fill=Condition)) +
+  geom_boxplot(alpha=0.7, outlier.shape = NA) +
+  geom_jitter(width=0.2, alpha=0.4) +
+  facet_wrap(~variable, scales="free") +
+  geom_text(data = stat_labels, aes(x = 1.5, y = Inf, label = label),
+            vjust = 2, fontface = "italic", size = 4, inherit.aes = FALSE) +
+  theme_bw() +
+  scale_fill_manual(values=c("Control"="#4575b4", "Infected"="#d73027")) +
+  labs(title="Pathogen-Driven Upregulation of the Autocrine/Immune Axis",
+       subtitle="F. nucleatum stimulates autocrine growth (HBEGF) and immune tolerance (GDF15)",
+       y="Normalized Counts (DESeq2)")
+
+ggsave("figures/Wnt_Hedgehog_Effector_Proof.png", proof_plot, width=8, height=6)
+
+print(proof_plot)
