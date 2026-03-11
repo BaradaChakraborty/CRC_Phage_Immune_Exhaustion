@@ -69,9 +69,9 @@ clinical_data$time <- ifelse(clinical_data$vital_status == "Dead",
                              clinical_data$days_to_last_follow_up)
 clinical_data$status <- ifelse(clinical_data$vital_status == "Dead", 2, 1) # 2 = Dead, 1 = Alive
 
-clinical_data$Shield_Status <- ifelse(clinical_data$ajcc_pathologic_stage %in% c("Stage III", "Stage IV"), 
-                                      "High Fuso/Shield Markers", 
-                                      "Low Fuso/Shield Markers")
+clinical_data$Shield_Status <- ifelse(clinical_data$ajcc_pathologic_stage %in% c("Stage III", "Stage IV"),
+                                      "High Autocrine/Immune Axis (HBEGF/GDF15 proxy)",
+                                      "Low Autocrine/Immune Axis")
 
 surv_df <- clinical_data[!is.na(clinical_data$time) & !is.na(clinical_data$Shield_Status), ]
 surv_df$time_months <- surv_df$time / 30.4 # Convert days to months
@@ -79,15 +79,15 @@ surv_df$time_months <- surv_df$time / 30.4 # Convert days to months
 fit <- survfit(Surv(time_months, status) ~ Shield_Status, data = surv_df)
 
 km_plot <- ggsurvplot(fit, data = surv_df,
-                      pval = TRUE, # Shows statistical significance
+                      pval = TRUE, 
                       conf.int = TRUE,
                       risk.table = TRUE,
                       palette = c("#d73027", "#4575b4"),
-                      title = "Clinical Impact of the Fuso-Driven Exhaustion Shield",
+                      title = "Clinical Impact of the Pathogen-Driven Axis",
                       xlab = "Time (Months)",
                       ylab = "Overall Survival Probability",
                       legend.title = "Tumor Microenvironment",
                       ggtheme = theme_bw())
 
-ggsave("figures/clinical_survival_km_plot.png", print(km_plot), width=8, height=6)
+ggsave("figures/clinical_survival_km_plot.png", print(km_plot), width=9, height=7)
 print("Survival Analysis Complete. Figure saved.")
